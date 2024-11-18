@@ -1,26 +1,66 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+    // Command 1: Switch Active Terminal by Name
+    context.subscriptions.push(
+        vscode.commands.registerCommand('extension.switchTerminalByName', (args) => {
+            try {
+                // Parse the JSON input from the arguments
+                const jsonInput = args || {};
+                const terminalName = jsonInput.terminalName;
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "terminal-util-commands" is now active!');
+                if (!terminalName) {
+                    vscode.window.showErrorMessage('Invalid JSON: "terminalName" is required.');
+                    return;
+                }
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('terminal-util-commands.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from terminal_util_commands!');
-	});
+                // Find the terminal by name
+                const terminal = vscode.window.terminals.find((t) => t.name === terminalName);
 
-	context.subscriptions.push(disposable);
+                if (terminal) {
+                    terminal.show();
+                } else {
+                    vscode.window.showErrorMessage(`No terminal found with name "${terminalName}".`);
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage('Invalid JSON input.');
+            }
+        })
+    );
+
+    // Command 2: Create and Split Terminals from JSON
+	context.subscriptions.push(
+        vscode.commands.registerCommand('extension.createAndSplitTerminals', async (args) => {
+            try {
+                const terminalNames = args;
+
+                if (!Array.isArray(terminalNames) || terminalNames.some((name) => typeof name !== 'string')) {
+                    vscode.window.showErrorMessage('Invalid JSON input. Provide an array of terminal names.');
+                    return;
+                }
+
+                let activeTerminal: vscode.Terminal | undefined = vscode.window.createTerminal({ name: terminalNames[0] });
+				activeTerminal.show();
+				terminalNames.shift();
+
+                // Create the first terminal
+                for(const name of terminalNames) {
+					// Split the current terminal
+					await vscode.commands.executeCommand('workbench.action.terminal.split');
+
+					// Rename the split terminal
+					activeTerminal = vscode.window.activeTerminal;
+					if (activeTerminal) {
+						await vscode.commands.executeCommand('workbench.action.terminal.renameWithArg', { name });
+					}
+                }
+
+                vscode.window.showInformationMessage('Terminals created and split successfully.');
+            } catch (error) {
+                vscode.window.showErrorMessage('Error creating and splitting terminals.');
+            }
+        })
+    );
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
